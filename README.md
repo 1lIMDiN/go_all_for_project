@@ -1,1 +1,1 @@
-# go_all_for_project
+# all_for_project
