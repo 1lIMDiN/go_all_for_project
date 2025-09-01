@@ -1,38 +1,36 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+	"time"
+)
 
-func generator(ch chan int, done chan struct{}) {
-	val := 0
-	dif := 0
+const Count = 4
 
-
-	for {
-
-		select {
-		case ch <- val:
-
-		case <-done:
-			return
-		}
-
-		dif++
-		val += dif
-
-	}
-}
+var wg sync.WaitGroup
 
 func main() {
-	ch := make(chan int, 15)
-	done := make(chan struct{})
+	ch := make(chan int, Count)
 
-	go func() {
-		defer close(done)
+	for i := 0; i < Count; i++ {
+		wg.Add(1)
 
-		for i := 0; i < 15; i++ {
-			fmt.Print(<-ch, " ")
-		}
-	}()
+		go worker(ch, i)
+	}
 
-	generator(ch, done)
+	for i := 0; i < 100; i++ {
+		ch <- i
+	}
+
+	close(ch)
+	wg.Wait()
+}
+
+func worker(ch <-chan int, i int) {
+	defer wg.Done()
+	for v := range ch {
+		fmt.Println("ch =", i, "v = ", v)
+		time.Sleep(50 * time.Millisecond)
+	}
 }
