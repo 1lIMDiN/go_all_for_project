@@ -3,51 +3,66 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
+	"io"
+	"net/http"
 	"time"
 )
 
-var wg sync.WaitGroup
+type stringKey string
+
+const (
+	userKey stringKey = "ID"
+)
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 
-	wg.Add(2)
-	go dots(ctx)
-	wg.Wait()
+	ctx = context.WithValue(ctx, userKey, 1)
+	result, err := reqHTTPS(ctx, "https://httpbin.org/delay/3")
+	if err != nil {
+		fmt.Println("Request error: ", err)
+		return
+	}
+
+	fmt.Println("Result:", result)
 }
 
-func dots(ctx context.Context) {
-	defer wg.Done()
-
-	ctxAsterisk, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
-
-	go Asterisk(ctxAsterisk)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			fmt.Print(".")
-			time.Sleep(500 *time.Millisecond)
-		}
+func reqHTTPS(ctx context.Context, url string) (string, error) {
+	err := userId(ctx)
+	if err != nil {
+		return "", err
 	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
-func Asterisk(ctx context.Context) {
-	defer wg.Done()
-
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println(ctx.Err())
-			return
-		default:
-			fmt.Print("*")
-			time.Sleep(500 *time.Millisecond)
+// Проверка входящих данных
+func userId(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		if _, ok := ctx.Value(userKey).(int); !ok {
+			return fmt.Errorf("wrong user-id format")
 		}
 	}
+	return nil
 }
