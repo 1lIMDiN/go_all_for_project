@@ -1,47 +1,42 @@
 package main
 
 import (
-	"fmt"
-	"sync"
-	"time"
+    "fmt"
+    "sync"
+    "time"
 )
 
-type Cashe struct {
-	mu sync.Mutex
-	m  map[int]int
+type Cache struct {
+    mu sync.RWMutex
+    m  map[int]int
 }
 
+func (cache *Cache) Get(i int) int {
+    cache.mu.RLock()
+    v, ok := cache.m[i]
+	cache.mu.RUnlock()
+    if ok {
+        return v
+    }
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+    // получаем значение для указанного ключа
+    v = 2 * i
+    cache.m[i] = v
+    return v
+}
 
 func main() {
-	cashe := Cashe{
-		m: make(map[int]int),
-	}
-
-	for i := 0; i < 20; i++ {
-
-		go func() {
-			for j := 0; j < 1000; j++ {
-				cashe.Get(j)
-			}
-		}()
-
-	}
-
-	time.Sleep(1 * time.Second)
-	fmt.Println(cashe.m)
-}
-
-func (c *Cashe) Get(i int) int {
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	v, ok := c.m[i]
-	if ok {
-		return v
-	}
-
-	v = 2 * i
-	c.m[i] = v
-	return v
+    cache := Cache{
+        m: make(map[int]int),
+    }
+    for i := 0; i < 20; i++ {
+        go func() {
+            for j := 0; j < 1000; j++ {
+                cache.Get(j)
+            }
+        }()
+    }
+    time.Sleep(1 * time.Second)
+    fmt.Println(len(cache.m))
 }
