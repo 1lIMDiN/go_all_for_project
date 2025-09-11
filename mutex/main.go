@@ -1,42 +1,54 @@
 package main
 
 import (
-    "fmt"
-    "sync"
-    "time"
+	"fmt"
+	"sync"
+	"time"
 )
 
-type Cache struct {
-    mu sync.RWMutex
-    m  map[int]int
+//  go run -race main.go
+
+type Map struct {
+	mu sync.RWMutex
+	m  map[string]string
 }
 
-func (cache *Cache) Get(i int) int {
-    cache.mu.RLock()
-    v, ok := cache.m[i]
-	cache.mu.RUnlock()
-    if ok {
-        return v
-    }
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-    // получаем значение для указанного ключа
-    v = 2 * i
-    cache.m[i] = v
-    return v
+func (m *Map) Get(key string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.m[key]
+}
+
+func (m *Map) Set(key, v string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.m[key] = v
 }
 
 func main() {
-    cache := Cache{
-        m: make(map[int]int),
-    }
-    for i := 0; i < 20; i++ {
-        go func() {
-            for j := 0; j < 1000; j++ {
-                cache.Get(j)
+	m := Map{
+		m: make(map[string]string),
+	}
+	for i := 0; i < 10; i++ {
+		go func() {
+			for {
+				m.Set("a", ".")
+				time.Sleep(50 * time.Millisecond)
+			}
+		}()
+	}
+	for i := 0; i < 10; i++ {
+		go func() {
+            count := 0
+            for {
+                v := m.Get("a")
+                count++
+                if count%10 == 0 {
+                    fmt.Print(v)
+                }
+                time.Sleep(20 * time.Millisecond)
             }
-        }()
-    }
+		}()
+	}
     time.Sleep(1 * time.Second)
-    fmt.Println(len(cache.m))
 }
