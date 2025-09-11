@@ -2,31 +2,37 @@ package main
 
 import (
 	"fmt"
-	"sync"
 )
 
 func main() {
-	var (
-		m  sync.Map
-		wg sync.WaitGroup
-	)
+	chIn := make(chan int)
+	chOut := make(chan int)
 
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j <= 10; j++ {
-				m.Store(j, j*j)
-			}
-		}()
-	}
-	wg.Wait()
+	go do(chIn, chOut)
 
-	m.Range(func(key, value any) bool {
-		if v, ok := value.(int); ok {
-			fmt.Println(v)
+	go func() {
+		defer close(chIn)
+		for i := 0; i <= 50; i++ {
+			chIn <- i
 		}
-		fmt.Printf("%v x %v = %v\n", key, key, value)
-		return true
-	})
+	}()
+
+	for {
+		v, ok := <-chOut
+		if !ok {
+			break
+		}
+		fmt.Print(v, " ")
+	}
+}
+
+func do(in, out chan int) {
+	defer close(out)
+	for {
+		v, ok := <-in
+		if !ok {
+			break
+		}
+		out <- v
+	}
 }
